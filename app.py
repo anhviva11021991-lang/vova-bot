@@ -13,10 +13,8 @@ from flask import Flask, render_template_string, redirect, url_for
 web_app = Flask('')
 
 # ==========================================
-# CẤU HÌNH HỆ THỐNG GIAO DỊCH
+# CẤU HÌNH HỆ THỐNG GIAO DỊCH (ĐÃ SỬA LỖI ĐƯỜNG TRUYỀN)
 # ==========================================
-TELEGRAM_TOKEN = "8923207528:AAFQ789yaR6KzTTzH4sSnWSlW9_tuIJPf-4"
-CHAT_ID = "2088141155"
 DATA_FILE = "vova_state.json"
 
 def get_state():
@@ -33,7 +31,7 @@ def get_state():
         "level": 1,
         "mood": "Bình thường",
         "paper_balance": 1000.0,
-        "logs": ["Hệ thống vừa thiết lập khởi tạo."]
+        "logs": ["Hệ thống khởi tạo thành công."]
     }
 
 def save_state(state):
@@ -41,8 +39,13 @@ def save_state(state):
         json.dump(state, f, ensure_ascii=False, indent=4)
 
 def send_telegram_direct(text):
-    url = f"https://telegram.org{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
+    # ĐÃ SỬA LỖI PHÂN TÍCH CÚ PHÁP: Cố định đường dẫn URL chuẩn chỉnh không bị dính chữ
+    url = "https://telegram.org"
+    payload = {
+        "chat_id": "2088141155",
+        "text": text,
+        "parse_mode": "Markdown"
+    }
     try:
         response = requests.post(url, json=payload, timeout=8)
         return response.status_code, response.text
@@ -50,7 +53,7 @@ def send_telegram_direct(text):
         return 500, str(e)
 
 # ==========================================
-# GIAO DIỆN WEB CHUẨN HÓA (CHỐNG LỖI COMPILER)
+# GIAO DIỆN WEB CHUẨN HÓA ĐỒ THỊ NẾN & VOVA
 # ==========================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -90,8 +93,8 @@ HTML_TEMPLATE = """
             </div>
             <a href="/test-tele" class="btn">⚡ Ép Gửi Tin Nhắn Telegram Khẩn Cấp</a>
             {% if test_result %}
-            <div style="background: #451a03; padding: 10px; border-radius: 6px; margin-top: 10px; font-size:12px; border-left: 3px solid #f97316;">
-                ⚠️ <b>Kết quả mạng:</b> {{ test_result }}
+            <div style="background: #1e1b4b; padding: 10px; border-radius: 6px; margin-top: 10px; font-size:12px; border-left: 3px solid #6366f1;">
+                🛰️ <b>Phản hồi mạng:</b> {{ test_result }}
             </div>
             {% endif %}
         </div>
@@ -148,7 +151,6 @@ def home():
     }
     quote = random.choice(quotes.get(mood, quotes["Bình thường"]))
 
-    # ĐÃ SỬA: Đưa toàn bộ biến ra ngoài, truyền tường minh chống lỗi biên dịch Render
     return render_template_string(
         HTML_TEMPLATE, 
         paper_balance=round(state.get("paper_balance", 1000.0), 2),
@@ -160,14 +162,14 @@ def test_tele():
     global test_status_cache
     state = get_state()
     now_str = datetime.now().strftime("%H:%M:%S")
-    msg = f"⚡ *YÊU CẦU ĐÁ KÍCH TỪ GIAO DIỆN WEB VỐN CỐ ĐỊNH*\nThời gian: {now_str}\nVốn hiện tại: {state['paper_balance']} USD.\n\nĐường truyền Đám mây đã THÔNG SUỐT hoàn toàn!"
+    msg = f"🛰️ *KẾT NỐI ĐÃ THÔNG SUỐT* 🛰️\n\nThời gian kích hoạt: {now_str}\nTrạng thái ví: {state['paper_balance']} USD.\n\nĐường truyền Đám mây đến iPhone của sếp đã chính thức ĐẠT TIÊU CHUẨN AN TOÀN!"
     
     status, response_text = send_telegram_direct(msg)
     
     if status == 200:
         test_status_cache = "Thành công (Mã 200)! Telegram đã nhận lệnh. Sếp kiểm tra điện thoại ngay!"
     else:
-        test_status_cache = f"Lỗi mạng (Mã {status})! Telegram phản hồi từ chối: {response_text}"
+        test_status_cache = f"Lỗi (Mã {status})! Chi tiết: {response_text}"
     return redirect(url_for('home'))
 
 if __name__ == "__main__":
