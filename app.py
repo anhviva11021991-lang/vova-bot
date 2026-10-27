@@ -195,7 +195,6 @@ def home():
     }
     quote = random.choice(quotes.get(mood, quotes["Bình thường"]))
     
-    # Nếu có kết quả test mạng thì lưu vào nhật ký log luôn
     if res and "Thành công" in res:
         state["mood"] = "Hân hoan 🎉"
         save_state(state)
@@ -224,3 +223,8 @@ def test_tele():
         test_status_cache = "Thành công (Mã 200)! Telegram đã nhận lệnh. Sếp kiểm tra điện thoại ngay!"
     else:
         test_status_cache = f"Lỗi mạng (Mã {status})! Telegram phản hồi từ chối: {response_text}"
+    return redirect(url_for('home'))
+
+if name == "main":
+port = int(os.environ.get("PORT", 8080))
+web_app.run(host='0.0.0.0', port=port)
