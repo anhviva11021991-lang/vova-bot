@@ -225,6 +225,3 @@ def test_tele():
         test_status_cache = f"Lỗi mạng (Mã {status})! Telegram phản hồi từ chối: {response_text}"
     return redirect(url_for('home'))
 
-if name == "main":
-port = int(os.environ.get("PORT", 8080))
-web_app.run(host='0.0.0.0', port=port)
