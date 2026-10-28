@@ -1,123 +1,232 @@
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
-
 import os
-import time
-import json
-import math
 import random
-from flask import Flask, render_template_string
+import time
+from datetime import datetime
+from flask import Flask, render_template_string, jsonify, request
 
-web_app = Flask('')
+app = Flask(__name__)
 
-DATA_FILE = "vova_state.json"
+# --- CẤU HÌNH HỆ THỐNG MẶC ĐỊNH ---
+CONFIG = {
+    "lever": 25,
+    "mode": "Cross",
+    "target_roe": 7.5,       # Mức chốt lời trung bình từ 5% - 10%
+    "daily_target": 50,      # Chỉ tiêu dòng tiền (20 - 100 USD)
+    "selected_coins": ["BTC", "ETH", "SOL", "BNB"], # Chạy đa nhiệm các Coin sếp chọn
+    "safe_mode": False,       # Cầu chì tự động ngắt kết nối API thật
+    "paper_trading": True,   # Giai đoạn 1: Giả lập Paper Trading
+    "owner_name": "Sếp",
+    "bot_name": "VOVA",
+    "voice_muted": False
+}
 
-def get_state():
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {
-        "paper_balance": 1000.0,
-        "level": 1,
-        "mood": "Bình thường"
-    }
+# --- TRẠNG THÁI LINH VẬT VOVA & HIỆU SUẤT ---
+VOVA_STATUS = {
+    "exp": 150,              # Điểm kinh nghiệm thực tế
+    "level": 2,              # Tiến hóa từ cấp 1 -> 10
+    "form": "Mầm cây 🌱",     # Hình thái tiến hóa theo cấp
+    "mood": "Hân hoan 😄",    # Trạng thái tâm trạng động
+    "pnl_today": 35.5,       # Lợi nhuận ròng trong ngày (USD)
+    "win_streak": 4,
+    "lose_streak": 0,
+    "total_trades_today": 28 # Tần suất vào lệnh cao (20 - 50 lần/ngày)
+}
 
-# ==========================================
-# GIAO DIỆN CHUẨN TRÌNH DUYỆT (CHỐNG CHẶN KẾT NỐI)
-# ==========================================
+# 10 Cấp độ tiến hóa của Thần thú VOVA
+EVOLUTION_STAGES = {
+    1: {"name": "Trứng sơ khai 🥚", "min_exp": 0},
+    2: {"name": "Mầm cây 🌱", "min_exp": 100},
+    3: {"name": "Cáo nhỏ 🦊", "min_exp": 300},
+    4: {"name": "Sói máy Cyber 🐺", "min_exp": 600},
+    5: {"name": "Hổ lôi đình 🐯", "min_exp": 1000},
+    6: {"name": "Phượng hoàng lửa 🦅", "min_exp": 1500},
+    7: {"name": "Kỳ lân công nghệ 🦄", "min_exp": 2200},
+    8: {"name": "Kim cang hộ pháp 🦍", "min_exp": 3000},
+    9: {"name": "Thượng cổ Thần thú 🦁", "min_exp": 4000},
+    10: {"name": "Thần Rồng AI Vĩ Đại 🐉", "min_exp": 5500}
+}
+
+# --- CƠ CHẾ CẬP NHẬT TIẾN HÓA / THOÁI HÓA ---
+def update_vova_evolution(pnl_change):
+    if pnl_change > 0:
+        VOVA_STATUS["exp"] += int(pnl_change * 2)
+        VOVA_STATUS["win_streak"] += 1
+        VOVA_STATUS["lose_streak"] = 0
+        VOVA_STATUS["mood"] = random.choice(["Hân hoan 😄", "Phấn khích 🚀", "Tự hào 😎"])
+    else:
+        VOVA_STATUS["exp"] = max(0, VOVA_STATUS["exp"] - int(abs(pnl_change) * 3))
+        VOVA_STATUS["win_streak"] = 0
+        VOVA_STATUS["lose_streak"] += 1
+        VOVA_STATUS["mood"] = random.choice(["Mếu máo 😢", "Tức giận 😡", "Lo lắng 😨"])
+    
+    current_lvl = 1
+    for lvl, stage in sorted(EVOLUTION_STAGES.items(), reverse=True):
+        if VOVA_STATUS["exp"] >= stage["min_exp"]:
+            current_lvl = lvl
+            break
+    
+    VOVA_STATUS["level"] = current_lvl
+    VOVA_STATUS["form"] = EVOLUTION_STAGES[current_lvl]["name"]
+
+    if VOVA_STATUS["lose_streak"] >= 3 and not CONFIG["paper_trading"]:
+        CONFIG["safe_mode"] = True
+        CONFIG["paper_trading"] = True
+
+# --- WEB UI INTERFACE (HTML5, ADVANCED CSS KEYFRAMES, JAVASCRIPT) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-    <title>VOVA AI Control Center</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Tải thư viện TradingView chính thức để hiển thị đồ thị nến -->
-    <script type="text/javascript" src="https://tradingview.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Giao Dịch AI - VOVA Engine</title>
+    <link href="https://jsdelivr.net" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #090d16; color: #f8fafc; padding: 15px; margin: 0; }
-        .grid-layout { display: grid; grid-template-columns: 1fr; gap: 15px; max-width: 1200px; margin: auto; }
-        @media (min-width: 768px) { .grid-layout { grid-template-columns: 350px 1fr; } }
-        .panel { background: #131a26; padding: 20px; border-radius: 12px; border: 1px solid #1e293b; }
-        h2, h3 { color: #38bdf8; text-align: center; margin-top: 0; }
-        .vova-avatar-box { text-align: center; padding: 20px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #38bdf8; background: rgba(56, 189, 248, 0.1); }
-        .vova-icon { font-size: 70px; filter: drop-shadow(0 0 15px #38bdf8); }
-        .quote-box { background: #020617; padding: 10px; border-radius: 6px; font-style: italic; color: #cbd5e1; font-size: 13px; text-align: center; margin-top: 10px; border-left: 3px solid #38bdf8; }
-        .data-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; font-size: 14px; }
-        .btn { display: block; width: 100%; padding: 12px; background: #22c55e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; box-sizing: border-box; }
-        .btn:hover { background: #16a34a; }
-        .chart-container { height: 500px; width: 100%; border-radius: 12px; overflow: hidden; }
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-green: #39ff14;
+            --neon-pink: #ff007f;
+            --bg-dark: #0a0e17;
+            --card-bg: #131a26;
+        }
+        body {
+            background-color: var(--bg-dark);
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .neon-border {
+            border: 1px solid var(--neon-blue);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+        .dashboard-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .vova-container {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .vova-avatar {
+            font-size: 80px;
+            z-index: 2;
+            animation: floatAnimation 3s ease-in-out infinite, blinkAnimation 4s ease-in-out infinite;
+        }
+        .vova-glow {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            z-index: 1;
+            animation: pulseGlow 2s infinite alternate;
+        }
+        @keyframes floatAnimation {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(2deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes blinkAnimation {
+            0%, 90%, 100% { opacity: 1; }
+            45%, 55% { opacity: 0.93; transform: scaleY(0.98); }
+        }
+        @keyframes pulseGlow {
+            0% {
+                box-shadow: 0 0 20px 5px rgba(0, 243, 255, 0.4), inset 0 0 15px rgba(0, 243, 255, 0.2);
+                background: rgba(0, 243, 255, 0.05);
+            }
+            100% {
+                box-shadow: 0 0 40px 15px rgba(255, 0, 127, 0.5), inset 0 0 25px rgba(255, 0, 127, 0.3);
+                background: rgba(255, 0, 127, 0.1);
+            }
+        }
+        .chart-container {
+            background: #02060c;
+            height: 250px;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+            padding: 10px;
+            gap: 4px;
+        }
+        .candle {
+            flex: 1;
+            border-radius: 2px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .candle.bullish { background-color: var(--neon-green); }
+        .candle.bearish { background-color: var(--neon-pink); }
+        .status-badge {
+            font-size: 0.85rem;
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
     </style>
 </head>
 <body>
-    <div class="grid-layout">
-        <!-- CỘT TRÁI: ĐIỀU KHIỂN LINH VẬT VOVA -->
-        <div class="panel">
-            <h2>🤖 ĐIỀU KHIỂN BOT AI</h2>
-            <div class="vova-avatar-box">
-                <div class="vova-icon">{{ icon }}</div>
-                <div style="font-weight: bold; margin-top: 10px; color: #38bdf8;">{{ form }}</div>
-                <div style="font-size: 12px; color: #94a3b8; margin-top: 3px;">Tâm trạng: {{ mood }}</div>
+    <div class="container-fluid py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+            <div>
+                <h2 class="text-info fw-bold m-0">VOVA AI QUANT FUTURES ENGINE v2.0</h2>
+                <small class="text-muted">Hệ thống vận hành đám mây 24/7 bảo mật tuyệt đối</small>
             </div>
-            <div class="quote-box">💬 VOVA nói: "Hệ thống đường truyền đã được thông mạch hoàn toàn ra trình duyệt rồi sếp ơi!"</div>
-            <div style="margin-top: 15px; margin-bottom: 15px;">
-                <div class="data-row"><span>💵 Vốn ví giấy:</span><span style="color: #f59e0b; font-weight:bold;">{{ paper_balance }} USD</span></div>
-                <div class="data-row"><span>⭐ Cấp độ VOVA:</span><span>Cấp {{ level }}/10</span></div>
-                <div class="data-row"><span>🟢 Trạng thái mạng:</span><span style="color:#4ade80; font-weight:bold;">ONLINE</span></div>
-            </div>
-            <!-- ÉP THÔNG MẠCH TELEGRAM: Chạy trực tiếp qua trình duyệt của sếp để bỏ qua bộ lọc chặn của Render -->
-            <a href="https://telegram.org!" 
-               target="_blank" class="btn">⚡ Ép Gửi Tin Nhắn Telegram Khẩn Cấp</a>
-        </div>
-        
-        <!-- CỘT PHẢI: ĐỒ THỊ NẾN THẬT BINANCE -->
-        <div class="panel" style="padding: 10px;">
-            <h3>📊 BIỂU ĐỒ NẾN THẬT BINANCE FUTURES (BTCUSDT)</h3>
-            <div class="chart-container">
-                <div id="vova_binance_chart" style="height:100%;width:100%;"></div>
-                <script type="text/javascript">
-                    // Khởi tạo Widget chính thức loại bỏ hoàn toàn lỗi từ chối kết nối iframe
-                    new TradingView.widget({
-                        "autosize": true,
-                        "symbol": "BINANCE:BTCUSDT.P",
-                        "interval": "5",
-                        "timezone": "Asia/Ho_Chi_Minh",
-                        "theme": "dark",
-                        "style": "1",
-                        "locale": "vi",
-                        "toolbar_bg": "#f1f3f6",
-                        "enable_publishing": false,
-                        "hide_side_toolbar": false,
-                        "allow_symbol_change": true,
-                        "container_id": "vova_binance_chart"
-                    });
-                </script>
+            <div class="text-end">
+                <span class="badge bg-danger status-badge me-2" id="safeModeBadge">Cầu chì: Đóng</span>
+                <span class="badge bg-warning text-dark status-badge" id="tradingModeBadge">Paper Trading (Giai đoạn 1)</span>
             </div>
         </div>
-    </div>
-</body>
-</html>
-"""
 
-@web_app.route('/')
-def home():
-    state = get_state()
-    lv = state.get("level", 1)
-    if lv <= 2: icon, form = "🥚", "Trứng Sơ Khai Neon"
-    elif lv <= 4: icon, form = "🌱", "Mầm Cây Điện Tử"
-    elif lv <= 6: icon, form = "🦊", "Cáo Nhỏ Công Nghệ"
-    else: icon, form = "🐉", "Thần Rồng AI Hủy Diệt"
-        
-    mood = state.get("mood", "Bình thường")
+        <div class="row">
+            <div class="col-md-4">
+                <div class="dashboard-card neon-border">
+                    <h5 class="text-info mb-3">🛠️ Khu Vực Cấu Hình Của Sếp</h5>
+                    <div class="mb-3">
+                        <label class="form-label text-white-50">🔄 Quét Sóng Đa Coin (Đồng thời):</label>
+                        <select class="form-select bg-dark text-white border-secondary" id="coinSelector" onchange="changeCoin()">
+                            <option value="BTC" selected>Cặp đa nhiệm: BTC/USDT Futures</option>
+                            <option value="ETH">Cặp đa nhiệm: ETH/USDT Futures</option>
+                            <option value="SOL">Cặp đa nhiệm: SOL/USDT Futures</option>
+                            <option value="BNB">Cặp đa nhiệm: BNB/USDT Futures</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-white-50 d-flex justify-content-between">
+                            <span>🎯 Chỉ tiêu dòng tiền hằng ngày:</span>
+                            <span class="text-info fw-bold" id="sliderVal">50 USD</span>
+                        </label>
+                        <input type="range" class="form-range" min="20" max="100" value="50" id="targetSlider" oninput="updateSlider(this.value)">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col">
+                            <label class="small text-white-50">Chế độ ký quỹ</label>
+                            <input type="text" class="form-control form-control-sm bg-dark text-white text-center border-secondary" value="Cross" disabled>
+                        </div>
+                        <div class="col">
+                            <label class="small text-white-50">Mức đòn bẩy</label>
+                            <input type="text" class="form-control form-control-sm bg-dark text-white text-center border-secondary" value="25x (Ưu tiên)" disabled>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-light btn-sm" onclick="toggleVoice()">🔊 Bật/Tắt Âm Thanh Linh Vật</button>
+                        <button class="btn btn-outline-info btn-sm" onclick="renameMaster()">👤 Đổi Tên Chủ Nhân / Linh Vật</button>
+                        <button class="btn btn-danger btn-sm fw-bold" onclick="triggerVoiceControl()">🎤 Nhấn Để Ra Lệnh Bằng Giọng Nói (AI)</button>
+                    </div>
+                </div>
+            </div>
 
-    return render_template_string(
-        HTML_TEMPLATE, 
-        paper_balance=round(state.get("paper_balance", 1000.0), 2),
-        level=lv, mood=mood, icon=icon, form=form
-    )
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    web_app.run(host='0.0.0.0', port=port)
+            <div class="col-md-4 text-center">
+                <div class="dashboard-card border border-secondary">
+                    <h5 class="text-warning mb-2" id="vovaName">Hệ Thống Linh Vật: VOVA</h5>
+                    <div class="vova-container my-3">
+                        <div class="vova-glow" id="vovaGlow"></div>
+                        <div class="vova-avatar" id="vovaAvatar">🌱</div>
+                    </div>
+                    <div class="row text-start mt-2 g-2">
