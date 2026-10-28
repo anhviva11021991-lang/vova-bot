@@ -227,6 +227,92 @@ HTML_TEMPLATE = """
                     <h5 class="text-warning mb-2" id="vovaName">Hệ Thống Linh Vật: VOVA</h5>
                     <div class="vova-container my-3">
                         <div class="vova-glow" id="vovaGlow"></div>
+    et currentCoin = "BTC";
+const vovaAvatars = {
+1: "🥚", 2: "🌱", 3: "🦊", 4: "🐺", 5: "🐯",
+6: "🦅", 7: "🦄", 8: "🦍", 9: "🦁", 10: "🐉"
+};
+function updateSlider(val) {
+document.getElementById("sliderVal").innerText = val + " USD";
+}
+function changeCoin() {
+currentCoin = document.getElementById("coinSelector").value;
+generateFakeCandles();
+document.getElementById("botSpeech").innerText = "Báo cáo Sếp, VOVA đã chuyển đa nhiệm thành công sang quét sóng dữ liệu cặp ${currentCoin}/USDT!";
+}
+function generateFakeCandles() {
+const chart = document.getElementById("candleChart");
+chart.innerHTML = "";
+for(let i=0; i<16; i++) {
+const candle = document.createElement("div");
+const height = Math.floor(Math.random() * 160) + 40;
+const isBullish = Math.random() > 0.45;
+candle.className = candle ${isBullish ? 'bullish' : 'bearish'};
+candle.style.height = ${height}px;
+chart.appendChild(candle);
+}
+}
+function toggleVoice() {
+alert("Đã chuyển đổi trạng thái âm thanh chống ồn cho linh vật VOVA!");
+}
+function renameMaster() {
+const newName = prompt("Nhập tên mới cho Linh vật VOVA hoặc cấu hình lại quyền sở hữu của Sếp:");
+if(newName) {
+document.getElementById("vovaName").innerText = "Hệ Thống Linh Vật: " + newName;
+}
+}
+function triggerVoiceControl() {
+alert("🎤 Đang kích hoạt Microphone Web UI... Hệ thống đang ghi âm lệnh tiếng Việt của Sếp để truyền thẳng dữ liệu phân tích tương quan vào lõi AI!");
+}
+setInterval(() => {
+fetch('/api/status?coin=' + currentCoin)
+.then(res => res.json())
+.then(data => {
+document.getElementById("vovaLevel").innerText = "Cấp " + data.level;
+document.getElementById("vovaForm").innerText = data.form;
+document.getElementById("vovaMood").innerText = data.mood;
+document.getElementById("vovaExp").innerText = data.exp + " EXP";
+document.getElementById("pnlToday").innerText = (data.pnl_today >= 0 ? "+" : "") + data.pnl_today.toFixed(2) + " USD";
+document.getElementById("totalTrades").innerText = data.total_trades_today + " / Ngày";
+document.getElementById("vovaAvatar").innerText = vovaAvatars[data.level] || "🌱";
+if(data.safe_mode) {
+document.getElementById("safeModeBadge").className = "badge bg-success status-badge";
+document.getElementById("safeModeBadge").innerText = "Cầu chì: TỰ NGẮT KÍCH HOẠT AN TOÀN";
+document.getElementById("tradingModeBadge").innerText = "Đã ngắt API thật -> Đang chạy Paper Trading học lại xu hướng";
+document.getElementById("tradingModeBadge").className = "badge bg-danger text-white status-badge";
+}
+if(Math.random() > 0.6) {
+generateFakeCandles();
+}
+});
+}, 3000);
+generateFakeCandles();
+
+
+
+"""
+@app.route('/')
+def index():
+return render_template_string(HTML_TEMPLATE)
+@app.route('/api/status', methods=['GET'])
+def get_status():
+coin = request.args.get('coin', 'BTC')
+pnl_change = random.choice([4.5, 8.2, -5.0, 12.0, -3.5, -15.0])
+VOVA_STATUS["pnl_today"] += pnl_change
+VOVA_STATUS["total_trades_today"] += 1
+update_vova_evolution(pnl_change)
+return jsonify({
+"exp": VOVA_STATUS["exp"],
+"level": VOVA_STATUS["level"],
+"form": VOVA_STATUS["form"],
+"mood": VOVA_STATUS["mood"],
+"pnl_today": VOVA_STATUS["pnl_today"],
+"total_trades_today": VOVA_STATUS["total_trades_today"],
+"safe_mode": CONFIG["safe_mode"],
+"paper_trading": CONFIG["paper_trading"]
+})
+if name == 'main':
+app.run(host='0.0.0.0', port=5000, debug=False)                    
                         <div class="vova-avatar" id="vovaAvatar">🌱</div>
                     </div>
                     <div class="row text-start mt-2 g-2">
