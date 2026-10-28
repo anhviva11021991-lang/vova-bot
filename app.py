@@ -10,11 +10,11 @@ app = Flask(__name__)
 CONFIG = {
     "lever": 25,
     "mode": "Cross",
-    "target_roe": 7.5,       # Mức chốt lời trung bình từ 5% - 10%
-    "daily_target": 50,      # Chỉ tiêu dòng tiền (20 - 100 USD)
-    "selected_coins": ["BTC", "ETH", "SOL", "BNB"], # Chạy đa nhiệm các Coin sếp chọn
-    "safe_mode": False,       # Cầu chì tự động ngắt kết nối API thật
-    "paper_trading": True,   # Giai đoạn 1: Giả lập Paper Trading
+    "target_roe": 7.5,       
+    "daily_target": 50,      
+    "selected_coins": ["BTC", "ETH", "SOL", "BNB"], 
+    "safe_mode": False,       
+    "paper_trading": True,   
     "owner_name": "Sếp",
     "bot_name": "VOVA",
     "voice_muted": False
@@ -22,42 +22,41 @@ CONFIG = {
 
 # --- TRẠNG THÁI LINH VẬT VOVA & HIỆU SUẤT ---
 VOVA_STATUS = {
-    "exp": 150,              # Điểm kinh nghiệm thực tế
-    "level": 2,              # Tiến hóa từ cấp 1 -> 10
-    "form": "Mầm cây 🌱",     # Hình thái tiến hóa theo cấp
-    "mood": "Hân hoan 😄",    # Trạng thái tâm trạng động
-    "pnl_today": 35.5,       # Lợi nhuận ròng trong ngày (USD)
+    "exp": 150,              
+    "level": 2,              
+    "form": "Mầm cây " + "\U0001F331",     
+    "mood": "Hân hoan " + "\U0001F604",    
+    "pnl_today": 35.5,       
     "win_streak": 4,
     "lose_streak": 0,
-    "total_trades_today": 28 # Tần suất vào lệnh cao (20 - 50 lần/ngày)
+    "total_trades_today": 28 
 }
 
-# 10 Cấp độ tiến hóa của Thần thú VOVA
+# 10 Cấp độ tiến hóa của Thần thú VOVA (Mã hóa Unicode an toàn chống lỗi Syntax)
 EVOLUTION_STAGES = {
-    1: {"name": "Trứng sơ khai 🥚", "min_exp": 0},
-    2: {"name": "Mầm cây 🌱", "min_exp": 100},
-    3: {"name": "Cáo nhỏ 🦊", "min_exp": 300},
-    4: {"name": "Sói máy Cyber 🐺", "min_exp": 600},
-    5: {"name": "Hổ lôi đình 🐯", "min_exp": 1000},
-    6: {"name": "Phượng hoàng lửa 🦅", "min_exp": 1500},
-    7: {"name": "Kỳ lân công nghệ 🦄", "min_exp": 2200},
-    8: {"name": "Kim cang hộ pháp 🦍", "min_exp": 3000},
-    9: {"name": "Thượng cổ Thần thú 🦁", "min_exp": 4000},
-    10: {"name": "Thần Rồng AI Vĩ Đại 🐉", "min_exp": 5500}
+    1: {"name": "Trứng sơ khai \U0001F95A", "min_exp": 0},
+    2: {"name": "Mầm cây \U0001F331", "min_exp": 100},
+    3: {"name": "Cáo nhỏ \U0001F98A", "min_exp": 300},
+    4: {"name": "Sói máy Cyber \U0001F43A", "min_exp": 600},
+    5: {"name": "Hổ lôi đình \U0001F42F", "min_exp": 1000},
+    6: {"name": "Phượng hoàng lửa \U0001F985", "min_exp": 1500},
+    7: {"name": "Kỳ lân công nghệ \U0001F984", "min_exp": 2200},
+    8: {"name": "Kim cang hộ pháp \U0001F98D", "min_exp": 3000},
+    9: {"name": "Thượng cổ Thần thú \U0001F941", "min_exp": 4000},
+    10: {"name": "Thần Rồng AI Vĩ Đại \U0001F409", "min_exp": 5500}
 }
 
-# --- CƠ CHẾ CẬP NHẬT TIẾN HÓA / THOÁI HÓA ---
 def update_vova_evolution(pnl_change):
     if pnl_change > 0:
         VOVA_STATUS["exp"] += int(pnl_change * 2)
         VOVA_STATUS["win_streak"] += 1
         VOVA_STATUS["lose_streak"] = 0
-        VOVA_STATUS["mood"] = random.choice(["Hân hoan 😄", "Phấn khích 🚀", "Tự hào 😎"])
+        VOVA_STATUS["mood"] = random.choice(["Hân hoan \U0001F604", "Phấn khích \U0001F680", "Tự hào \U0001F60E"])
     else:
         VOVA_STATUS["exp"] = max(0, VOVA_STATUS["exp"] - int(abs(pnl_change) * 3))
         VOVA_STATUS["win_streak"] = 0
         VOVA_STATUS["lose_streak"] += 1
-        VOVA_STATUS["mood"] = random.choice(["Mếu máo 😢", "Tức giận 😡", "Lo lắng 😨"])
+        VOVA_STATUS["mood"] = random.choice(["Mếu máo \U0001F622", "Tức giận \U0001F621", "Lo lắng \U0001F628"])
     
     current_lvl = 1
     for lvl, stage in sorted(EVOLUTION_STAGES.items(), reverse=True):
@@ -72,7 +71,7 @@ def update_vova_evolution(pnl_change):
         CONFIG["safe_mode"] = True
         CONFIG["paper_trading"] = True
 
-# --- WEB UI INTERFACE (HTML5, ADVANCED CSS KEYFRAMES, JAVASCRIPT) ---
+# --- WEB UI INTERFACE ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -187,7 +186,7 @@ HTML_TEMPLATE = """
         <div class="row">
             <div class="col-md-4">
                 <div class="dashboard-card neon-border">
-                    <h5 class="text-info mb-3">🛠️ Khu Vực Cấu Hình Của Sếp</h5>
+                    <h5 class="text-info mb-3">\\uD83D\\uDEE0\\uFE0F Khu Vực Cấu Hình Của Sếp</h5>
                     <div class="mb-3">
                         <label class="form-label text-white-50">🔄 Quét Sóng Đa Coin (Đồng thời):</label>
                         <select class="form-select bg-dark text-white border-secondary" id="coinSelector" onchange="changeCoin()">
@@ -227,92 +226,8 @@ HTML_TEMPLATE = """
                     <h5 class="text-warning mb-2" id="vovaName">Hệ Thống Linh Vật: VOVA</h5>
                     <div class="vova-container my-3">
                         <div class="vova-glow" id="vovaGlow"></div>
-    et currentCoin = "BTC";
-const vovaAvatars = {
-1: "🥚", 2: "🌱", 3: "🦊", 4: "🐺", 5: "🐯",
-6: "🦅", 7: "🦄", 8: "🦍", 9: "🦁", 10: "🐉"
-};
-function updateSlider(val) {
-document.getElementById("sliderVal").innerText = val + " USD";
-}
-function changeCoin() {
-currentCoin = document.getElementById("coinSelector").value;
-generateFakeCandles();
-document.getElementById("botSpeech").innerText = "Báo cáo Sếp, VOVA đã chuyển đa nhiệm thành công sang quét sóng dữ liệu cặp ${currentCoin}/USDT!";
-}
-function generateFakeCandles() {
-const chart = document.getElementById("candleChart");
-chart.innerHTML = "";
-for(let i=0; i<16; i++) {
-const candle = document.createElement("div");
-const height = Math.floor(Math.random() * 160) + 40;
-const isBullish = Math.random() > 0.45;
-candle.className = candle ${isBullish ? 'bullish' : 'bearish'};
-candle.style.height = ${height}px;
-chart.appendChild(candle);
-}
-}
-function toggleVoice() {
-alert("Đã chuyển đổi trạng thái âm thanh chống ồn cho linh vật VOVA!");
-}
-function renameMaster() {
-const newName = prompt("Nhập tên mới cho Linh vật VOVA hoặc cấu hình lại quyền sở hữu của Sếp:");
-if(newName) {
-document.getElementById("vovaName").innerText = "Hệ Thống Linh Vật: " + newName;
-}
-}
-function triggerVoiceControl() {
-alert("🎤 Đang kích hoạt Microphone Web UI... Hệ thống đang ghi âm lệnh tiếng Việt của Sếp để truyền thẳng dữ liệu phân tích tương quan vào lõi AI!");
-}
-setInterval(() => {
-fetch('/api/status?coin=' + currentCoin)
-.then(res => res.json())
-.then(data => {
-document.getElementById("vovaLevel").innerText = "Cấp " + data.level;
-document.getElementById("vovaForm").innerText = data.form;
-document.getElementById("vovaMood").innerText = data.mood;
-document.getElementById("vovaExp").innerText = data.exp + " EXP";
-document.getElementById("pnlToday").innerText = (data.pnl_today >= 0 ? "+" : "") + data.pnl_today.toFixed(2) + " USD";
-document.getElementById("totalTrades").innerText = data.total_trades_today + " / Ngày";
-document.getElementById("vovaAvatar").innerText = vovaAvatars[data.level] || "🌱";
-if(data.safe_mode) {
-document.getElementById("safeModeBadge").className = "badge bg-success status-badge";
-document.getElementById("safeModeBadge").innerText = "Cầu chì: TỰ NGẮT KÍCH HOẠT AN TOÀN";
-document.getElementById("tradingModeBadge").innerText = "Đã ngắt API thật -> Đang chạy Paper Trading học lại xu hướng";
-document.getElementById("tradingModeBadge").className = "badge bg-danger text-white status-badge";
-}
-if(Math.random() > 0.6) {
-generateFakeCandles();
-}
-});
-}, 3000);
-generateFakeCandles();
-
-
-
-"""
-@app.route('/')
-def index():
-return render_template_string(HTML_TEMPLATE)
-@app.route('/api/status', methods=['GET'])
-def get_status():
-coin = request.args.get('coin', 'BTC')
-pnl_change = random.choice([4.5, 8.2, -5.0, 12.0, -3.5, -15.0])
-VOVA_STATUS["pnl_today"] += pnl_change
-VOVA_STATUS["total_trades_today"] += 1
-update_vova_evolution(pnl_change)
-return jsonify({
-"exp": VOVA_STATUS["exp"],
-"level": VOVA_STATUS["level"],
-"form": VOVA_STATUS["form"],
-"mood": VOVA_STATUS["mood"],
-"pnl_today": VOVA_STATUS["pnl_today"],
-"total_trades_today": VOVA_STATUS["total_trades_today"],
-"safe_mode": CONFIG["safe_mode"],
-"paper_trading": CONFIG["paper_trading"]
-})
-if name == 'main':
-app.run(host='0.0.0.0', port=5000, debug=False)                    
-                        <div class="vova-avatar" id="vovaAvatar">🌱</div>
+                        <div class="vova-avatar" id="vovaAvatar">\\uD83C\\uDF31</div>
                     </div>
                     <div class="row text-start mt-2 g-2">
+                        <div class="col-6"><span class="text-white-50 small">Cấp độ:</span> <strong class="text-info" id="vovaLevel">Cấp 2</strong></div>
+                        <div class="col-6"><span class="text-white-50 small">Hình thái:</span> <strong class="text-success" id="vovaForm">Mầm cây \\uD83C\\uDF31</strong></div>
