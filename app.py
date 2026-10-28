@@ -6,9 +6,6 @@ from flask import Flask, render_template_string, jsonify, request
 
 app = Flask(__name__)
 
-# ==============================================================================
-# STATE HỆ THỐNG GIẢ LẬP TRÊN RAM (KHÔNG CẦN SET UP DATABASE TRÊN RENDER)
-# ==============================================================================
 bot_state = {
     "owner_name": "Sếp",
     "vova_name": "VOVA AI",
@@ -119,7 +116,7 @@ def index():
 def get_state():
     quotes = VOVA_QUOTES.get(bot_state["vova_mood"], VOVA_QUOTES["Bình Thường"])
     current_quote = random.choice(quotes)
-    current_form = next((f for f in VOVA_FORMS if f["level"] == bot_state["vova_level"]), VOVA_FORMS[0])
+    current_form = next((f for f in VOVA_FORMS if f["level"] == bot_state["vova_level"]), VOVA_FORMS)
     return jsonify({
         **bot_state,
         "vova_quote": current_quote,
@@ -225,89 +222,6 @@ HTML_INTERFACE = """
             background: var(--neon-blue); border: none; color: black; font-weight: bold;
             padding: 10px 20px; border-radius: 6px; cursor: pointer; transition: 0.2s;
         }
-button:hover { opacity: 0.8; box-shadow: 0 0 15px var(--neon-blue); }
-.vova-speech {
-background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px;
-margin-top: 10px; max-width: 80%; text-align: center; border-left: 4px solid var(--neon-green);
-}
-function updateTarget(val) {
-document.getElementById('lbl-target').innerText = val;
-fetch('/api/update', {
-method: 'POST',
-headers: {'Content-Type': 'application/json'},
-body: JSON.stringify({daily_target: val})
-});
-}
-function updateCoins() {
-let selected = [];
-document.querySelectorAll('.coin-select:checked').forEach(cb => selected.push(cb.value));
-fetch('/api/update', {
-method: 'POST',
-headers: {'Content-Type': 'application/json'},
-body: JSON.stringify({selected_coins: selected})
-});
-}
-function saveProfile() {
-let owner = document.getElementById('txt-owner').value;
-let vova = document.getElementById('txt-vova-name').value;
-fetch('/api/update', {
-method: 'POST',
-headers: {'Content-Type': 'application/json'},
-body: JSON.stringify({owner_name: owner, vova_name: vova})
-}).then(() => alert("Đã đồng bộ cấu hình cá nhân hóa!"));
-}
-function switchMode(mode) {
-fetch('/api/update', {
-method: 'POST',
-headers: {'Content-Type': 'application/json'},
-body: JSON.stringify({trading_mode: mode})
-});
-}
-function toggleSound() {
-let isChecked = document.getElementById('chk-sound').checked;
-fetch('/api/update', {
-method: 'POST',
-headers: {'Content-Type': 'application/json'},
-body: JSON.stringify({sound_enabled: isChecked})
-});
-}
-function triggerVoice() {
-let commands = [
-"Kiểm tra tin phát ngôn từ Nhà Trắng xem có tác động BTC không em",
-"Quét sóng thuật toán đa khung ZigZag cặp SOL cho anh",
-"Báo cáo hiệu suất PnL dòng tiền ngày hôm nay thế nào rồi VOVA"
-];
-let randomCommand = commands[Math.floor(Math.random() * commands.length)];
-let speech = prompt("Nói hoặc nhập yêu cầu lệnh Tiếng Việt cho AI:", randomCommand);
-if (speech) {
-fetch('/api/voice-command', {
-method: 'POST',
-headers: {'Content-Type': 'application/json'},
-body: JSON.stringify({text: speech})
-}).then(res => res.json()).then(data => alert("AI Phản hồi: " + data.reply));
-}
-}
-setInterval(() => {
-fetch('/api/state')
-.then(res => res.json())
-.then(state => {
-document.getElementById('lbl-owner').innerText = state.owner_name;
-document.getElementById('vova-avatar').innerText = state.vova_form_name.split(' ').pop();
-document.getElementById('vova-lvl-name').innerText = "Cấp " + state.vova_level + ": " + state.vova_form_name;
-document.getElementById('vova-exp-display').innerText = "EXP tích lũy: " + state.vova_exp + " | PnL ròng tổng: " + state.current_pnl.toFixed(2) + " USD";
-document.getElementById('vova-quote').innerText = "${state.vova_name}: ${state.vova_quote}";
-document.getElementById('vova-glow').style.setProperty('--vova-glow-color', state.vova_color);
-let badge = document.getElementById('badge-mode');
-badge.innerText = state.trading_mode;
-badge.className = (state.trading_mode === "Live Trading") ? "status-badge badge-live" : "status-badge badge-paper";
-let logBox = document.getElementById('log-container');
-logBox.innerHTML = state.logs.map(l => <div>${l}</div>).join('');
-});
-}, 2000);
-
-
-
-"""
-if name == "main":
-port = int(os.environ.get("PORT", 5000))
-app.run(host="0.0.0.0", port=port)
+        button:hover { opacity: 0.8; box-shadow: 0 0 15px var(--neon-blue); }
+        .vova-speech {
+            background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px;
