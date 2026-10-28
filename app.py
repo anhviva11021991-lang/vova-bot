@@ -24,15 +24,15 @@ CONFIG = {
 VOVA_STATUS = {
     "exp": 150,              
     "level": 2,              
-    "form": "Mầm cây " + "\U0001F331",     
-    "mood": "Hân hoan " + "\U0001F604",    
+    "form": "Mầm cây \U0001F331",     
+    "mood": "Hân hoan \U0001F604",    
     "pnl_today": 35.5,       
     "win_streak": 4,
     "lose_streak": 0,
     "total_trades_today": 28 
 }
 
-# 10 Cấp độ tiến hóa của Thần thú VOVA (Mã hóa Unicode an toàn chống lỗi Syntax)
+# 10 Cấp độ tiến hóa của Thần thú VOVA
 EVOLUTION_STAGES = {
     1: {"name": "Trứng sơ khai \U0001F95A", "min_exp": 0},
     2: {"name": "Mầm cây \U0001F331", "min_exp": 100},
@@ -71,9 +71,8 @@ def update_vova_evolution(pnl_change):
         CONFIG["safe_mode"] = True
         CONFIG["paper_trading"] = True
 
-# --- WEB UI INTERFACE ---
-HTML_TEMPLATE = """
-<!DOCTYPE html>
+# --- WEB UI INTERFACE (CHUẨN HÓA KHÔNG LỖI CHUỖI) ---
+HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -186,7 +185,7 @@ HTML_TEMPLATE = """
         <div class="row">
             <div class="col-md-4">
                 <div class="dashboard-card neon-border">
-                    <h5 class="text-info mb-3">\\uD83D\\uDEE0\\uFE0F Khu Vực Cấu Hình Của Sếp</h5>
+                    <h5 class="text-info mb-3">🛠️ Khu Vực Cấu Hình Của Sếp</h5>
                     <div class="mb-3">
                         <label class="form-label text-white-50">🔄 Quét Sóng Đa Coin (Đồng thời):</label>
                         <select class="form-select bg-dark text-white border-secondary" id="coinSelector" onchange="changeCoin()">
@@ -226,8 +225,8 @@ HTML_TEMPLATE = """
                     <h5 class="text-warning mb-2" id="vovaName">Hệ Thống Linh Vật: VOVA</h5>
                     <div class="vova-container my-3">
                         <div class="vova-glow" id="vovaGlow"></div>
-                        <div class="vova-avatar" id="vovaAvatar">\\uD83C\\uDF31</div>
+                        <div class="vova-avatar" id="vovaAvatar">🌱</div>
                     </div>
                     <div class="row text-start mt-2 g-2">
                         <div class="col-6"><span class="text-white-50 small">Cấp độ:</span> <strong class="text-info" id="vovaLevel">Cấp 2</strong></div>
-                        <div class="col-6"><span class="text-white-50 small">Hình thái:</span> <strong class="text-success" id="vovaForm">Mầm cây \\uD83C\\uDF31</strong></div>
+                        <div class="col-6"><span class="text-white-50 small">Hình thái:</span> <strong class="text-success" id="vovaForm">Mầm cây 🌱</strong></div>
