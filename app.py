@@ -146,8 +146,7 @@ def voice_command():
     bot_state["logs"].append(f"🎙️ Nhận lệnh giọng nói: '{speech_text}' -> AI đang phân tích dữ liệu vĩ mô liên kết biểu đồ...")
     return jsonify({"reply": f"AI nhận lệnh thành công. Xu hướng ZigZag đa khung đang khớp dữ liệu thời gian thực."})
 
-HTML_INTERFACE = """
-<!DOCTYPE html>
+HTML_INTERFACE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
