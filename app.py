@@ -195,24 +195,3 @@ def home():
         quote=quote, current_coin=state.get("current_coin"), test_result=res
     )
 
-@web_app.route('/change-coin', methods=['POST'])
-def change_coin():
-state = get_state()
-selected_coin = request.form.get("coin", "BINANCE:ZECUSDT.P")
-state["current_coin"] = selected_coin
-save_state(state)
-return redirect(url_for('home'))
-@web_app.route('/test-tele')
-def test_tele():
-global test_status_cache
-state = get_state()
-coin_clean = state.get("current_coin", "ZECUSDT").split(":")[-1].replace(".P", "")
-status, response_text = send_telegram_direct(coin_clean)
-if status == 200:
-test_status_cache = f"Thành công (Mã 200)! Đã bắn tín hiệu quét {coin_clean} về Telegram iPhone của sếp mượt mà!"
-else:
-test_status_cache = f"Lỗi (Mã {status})! Chi tiết: {response_text}"
-return redirect(url_for('home'))
-if name == "main":
-port = int(os.environ.get("PORT", 8080))
-web_app.run(host='0.0.0.0', port=port)
