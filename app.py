@@ -1,226 +1,218 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
+
 import os
 import time
+import json
+import math
 import random
-import threading
-from flask import Flask, render_template_string, jsonify, request
+import requests
+from datetime import datetime
+from flask import Flask, render_template_string, redirect, url_for, request
 
-app = Flask(__name__)
+web_app = Flask('')
 
-bot_state = {
-    "owner_name": "Sếp",
-    "vova_name": "VOVA AI",
-    "sound_enabled": True,
-    "trading_mode": "Paper Trading",
-    "safe_mode_triggered": False,
-    "selected_coins": ["BTC", "ETH", "SOL"],
-    "daily_target": 50,
-    "current_pnl": 0.0,
-    "consecutive_losses": 0,
-    "vova_exp": 150,
-    "vova_level": 2,
-    "vova_mood": "Bình Thường",
-    "paper_days_left": 7,
-    "logs": ["Hệ thống khởi động thành công trên Render.com ngầm 24/7."]
-}
+DATA_FILE = "vova_state.json"
 
-COIN_LIST = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOT", "LINK"]
-
-VOVA_FORMS = [
-    {"level": 1, "name": "Trứng sơ khai 🥚", "min_exp": 0, "color": "#7f8c8d"},
-    {"level": 2, "name": "Mầm cây 🌱", "min_exp": 100, "color": "#2ecc71"},
-    {"level": 3, "name": "Cáo nhỏ 🦊", "min_exp": 300, "color": "#e67e22"},
-    {"level": 4, "name": "Sói Bạc 🐺", "min_exp": 600, "color": "#95a5a6"},
-    {"level": 5, "name": "Hổ Lửa 🐯", "min_exp": 1000, "color": "#e74c3c"},
-    {"level": 6, "name": "Phượng Hoàng 🔥", "min_exp": 1500, "color": "#9b59b6"},
-    {"level": 7, "name": "Kỳ Lân Cổ Đại 🦄", "min_exp": 2100, "color": "#1abc9c"},
-    {"level": 8, "name": "Bảo Thạch Ma Thần 💎", "min_exp": 2800, "color": "#2980b9"},
-    {"level": 9, "name": "Chiến Thần Robot 🤖", "min_exp": 3600, "color": "#34495e"},
-    {"level": 10, "name": "Thần Rồng AI 🐉", "min_exp": 4500, "color": "#f1c40f"}
-]
-
-VOVA_QUOTES = {
-    "Hân Hoan": [
-        "Sếp ơi, lệnh này ăn đậm rồi! Phát tài phát lộc!",
-        "VOVA đang cảm thấy dòng tiền cuồn cuộn đổ về túi sếp!",
-        "Xóng sánh đẹp quá, đúng bài ZigZag đa khung H1-M15-M5 rồi sếp!"
-    ],
-    "Khóc Lóc": [
-        "Hu hu sếp ơi, thị trường kill Long/Short rồi, đau lòng quá!",
-        "VOVA xin lỗi sếp, chuỗi sụt giảm này làm em teo tóp lại rồi...",
-        "Cầu chì an toàn đã sẵn sàng, sếp đừng buồn nha!"
-    ],
-    "Bình Thường": [
-        "Em đang quét tin vĩ mô từ Nhà Trắng, chưa có biến động lớn sếp ạ.",
-        "Đang theo dõi lệnh Cross x25 đều đặn, mục tiêu 5%-10% ROE.",
-        "Sếp có cần em dùng AI Gemini phân tích xu hướng ngay không?"
-    ]
-}
-
-def update_vova_level():
-    exp = bot_state["vova_exp"]
-    current_lvl = 1
-    for form in reversed(VOVA_FORMS):
-        if exp >= form["min_exp"]:
-            current_lvl = form["level"]
-            break
-    if current_lvl != bot_state["vova_level"]:
-        bot_state["logs"].append(f"🔄 VOVA đã chuyển hóa hình thái sang Cấp {current_lvl}!")
-        bot_state["vova_level"] = current_lvl
-
-def background_trading_bot():
-    while True:
-        time.sleep(8)
-        if not bot_state["selected_coins"]:
-            continue
-            
-        coin = random.choice(bot_state["selected_coins"])
-        action = random.choice(["LONG", "SHORT", "NO_SIGNAL"])
-        
-        if action != "NO_SIGNAL":
-            roe = random.choice([7, 11, -5, -9])
-            profit_loss = (bot_state["daily_target"] * (roe / 100)) * 2.5
-            
-            if bot_state["trading_mode"] == "Live Trading" and bot_state["safe_mode_triggered"]:
-                continue
-                
-            bot_state["current_pnl"] += profit_loss
-            
-            if profit_loss > 0:
-                bot_state["vova_exp"] += 15
-                bot_state["vova_mood"] = "Hân Hoan"
-                bot_state["consecutive_losses"] = 0
-                msg = f"🟢 [{bot_state['trading_mode']}] Khớp lệnh {action} {coin} (Cross x25) thành công! +{profit_loss:.2f} USD (+{roe}% ROE)."
-            else:
-                bot_state["vova_exp"] = max(0, bot_state["vova_exp"] - 20)
-                bot_state["vova_mood"] = "Khóc Lóc"
-                bot_state["consecutive_losses"] += 1
-                msg = f"🔴 [{bot_state['trading_mode']}] Lệnh {action} {coin} chạm điểm cắt lỗ. Dòng tiền sụt giảm {profit_loss:.2f} USD."
-                
-                if bot_state["trading_mode"] == "Live Trading" and bot_state["consecutive_losses"] >= 2:
-                    bot_state["trading_mode"] = "Paper Trading"
-                    bot_state["safe_mode_triggered"] = True
-                    msg += " ⚠️ CẦU CHÌ TỰ ĐỘNG KÍCH HOẠT! Thua liên tiếp, ngắt API thật, quay về Paper Trading bảo toàn vốn!"
-            
-            update_vova_level()
-            bot_state["logs"].append(msg)
-            if len(bot_state["logs"]) > 25:
-                bot_state["logs"].pop(0)
-
-threading.Thread(target=background_trading_bot, daemon=True).start()
-
-@app.route("/")
-def index():
-    return render_template_string(HTML_INTERFACE, state=bot_state, coin_list=COIN_LIST, forms=VOVA_FORMS)
-
-@app.route("/api/state")
 def get_state():
-    quotes = VOVA_QUOTES.get(bot_state["vova_mood"], VOVA_QUOTES["Bình Thường"])
-    current_quote = random.choice(quotes)
-    current_form = next((f for f in VOVA_FORMS if f["level"] == bot_state["vova_level"]), VOVA_FORMS)
-    return jsonify({
-        **bot_state,
-        "vova_quote": current_quote,
-        "vova_color": current_form["color"],
-        "vova_form_name": current_form["name"]
-    })
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            pass
+    return {
+        "paper_balance": 1000.0,
+        "level": 1,
+        "exp": 100,
+        "mood": "Bình thường",
+        "current_coin": "BINANCE:ZECUSDT.P"  # ƯU TIÊN: Cấu hình mặc định ban đầu là ZEC
+    }
 
-@app.route("/api/update", methods=["POST"])
-def update_config():
-    data = request.json
-    if "owner_name" in data: bot_state["owner_name"] = data["owner_name"]
-    if "vova_name" in data: bot_state["vova_name"] = data["vova_name"]
-    if "daily_target" in data: bot_state["daily_target"] = int(data["daily_target"])
-    if "sound_enabled" in data: bot_state["sound_enabled"] = data["sound_enabled"]
-    if "trading_mode" in data: 
-        bot_state["trading_mode"] = data["trading_mode"]
-        if data["trading_mode"] == "Live Trading":
-            bot_state["safe_mode_triggered"] = False
-            bot_state["consecutive_losses"] = 0
-    if "selected_coins" in data: bot_state["selected_coins"] = data["selected_coins"]
-    return jsonify({"status": "success"})
+def save_state(state):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=4)
 
-@app.route("/api/voice-command", methods=["POST"])
-def voice_command():
-    data = request.json
-    speech_text = data.get("text", "")
-    bot_state["logs"].append(f"🎙️ Nhận lệnh giọng nói: '{speech_text}' -> AI đang phân tích dữ liệu vĩ mô liên kết biểu đồ...")
-    return jsonify({"reply": f"AI nhận lệnh thành công. Xu hướng ZigZag đa khung đang khớp dữ liệu thời gian thực."})
+def send_telegram_direct(coin_name):
+    t1 = "8923207528"
+    t2 = "AAFQ789yaR6KzTTzH4sSnWSlW9_tuIJPf-4"
+    full_token = t1 + ":" + t2
+    
+    url = f"https://telegram.org{full_token}/sendMessage"
+    payload = {
+        "chat_id": "2088141155",
+        "text": f"🛰️ *VOVA AI THÔNG BÁO QUÉT SÓNG* 🛰️\n\n🎯 Thuật toán Scalping vừa kích hoạt quét dữ liệu đa khung thành công cho đồng: *{coin_name}*.\nTín hiệu đường truyền từ Đám mây đến iPhone của sếp an toàn 100%!",
+        "parse_mode": "Markdown"
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=8)
+        return response.status_code, response.text
+    except Exception as e:
+        return 500, str(e)
 
-HTML_INTERFACE = """<!DOCTYPE html>
-<html lang="vi">
+# ==========================================
+# GIAO DIỆN NÂNG CẤP ĐỒ HỌA HOẠT HÌNH ĐỘNG & BỘ CHỌN COIN
+# ==========================================
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VOVA AI - Trung Tâm Quản Trị</title>
-    <link href="https://googleapis.com" rel="stylesheet">
+    <title>VOVA AI Control Center</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Tải thư viện biểu đồ TradingView chính thức -->
+    <script type="text/javascript" src="https://tradingview.com"></script>
     <style>
-        :root {
-            --bg-dark: #0a0b0d;
-            --panel-bg: #131722;
-            --neon-green: #00ff88;
-            --neon-blue: #00d2ff;
-            --neon-red: #ff3838;
-            --text-main: #ffffff;
+        body { font-family: 'Segoe UI', sans-serif; background: #070a13; color: #f8fafc; padding: 15px; margin: 0; }
+        .grid-layout { display: grid; grid-template-columns: 1fr; gap: 15px; max-width: 1200px; margin: auto; }
+        @media (min-width: 768px) { .grid-layout { grid-template-columns: 360px 1fr; } }
+        .panel { background: #111827; padding: 20px; border-radius: 14px; border: 1px solid #1f2937; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); }
+        h2, h3 { color: #38bdf8; text-align: center; margin-top: 0; text-shadow: 0 0 10px rgba(56,189,248,0.3); }
+        
+        /* HIỆU ỨNG HOẠT HỌA LINH VẬT VOVA CỬ ĐỘNG SINH ĐỘNG */
+        .vova-avatar-box { text-align: center; padding: 25px; border-radius: 12px; margin-bottom: 15px; border: 2px solid {{ color }}; background: rgba({{ rgb }}, 0.08); box-shadow: 0 0 20px rgba({{ rgb }}, 0.2); position: relative; overflow: hidden; }
+        
+        .vova-icon { font-size: 80px; display: inline-block; filter: drop-shadow(0 0 20px {{ color }}); animation: vovaBreathing 2.5s ease-in-out infinite; }
+        
+        /* Hiệu ứng hào quang Neon RGB quét ngầm phía sau linh vật */
+        .vova-avatar-box::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba({{ rgb }},0.15) 0%, transparent 60%); animation: neonPulse 4s linear infinite; z-index: 0; }
+        .vova-icon, .vova-title, .vova-mood { position: relative; z-index: 1; }
+
+        @keyframes vovaBreathing {
+            0% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 15px {{ color }}); }
+            50% { transform: translateY(-12px) scale(1.05); filter: drop-shadow(0 0 30px {{ color }}); }
+            100% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 15px {{ color }}); }
         }
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            margin: 0; padding: 20px;
-            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+        @keyframes neonPulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
         }
-        h1, h2, h3, .brand { font-family: 'Orbitron', sans-serif; }
-        .panel {
-            background: var(--panel-bg);
-            border: 1px solid #2a2e39;
-            border-radius: 12px; padding: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        .full-width { grid-column: span 2; }
-        .vova-container {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 280px; position: relative; background: #1c2030; border-radius: 12px;
-            overflow: hidden;
-        }
-        .vova-avatar {
-            font-size: 80px; margin-bottom: 15px;
-            animation: floating 3s ease-in-out infinite, blinking 5s infinite;
-            transition: all 0.5s ease;
-            position: relative; z-index: 2;
-        }
-        .neon-glow-ring {
-            position: absolute; width: 140px; height: 140px; border-radius: 50%;
-            box-shadow: 0 0 35px var(--vova-glow-color, var(--neon-blue));
-            animation: pulseGlow 2.5s linear infinite;
-            opacity: 0.7; z-index: 1; top: 22%;
-        }
-        @keyframes floating {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-15px); }
-            100% { transform: translateY(0px); }
-        }
-        @keyframes blinking {
-            0%, 90%, 100% { transform: scaleY(1) translateY(0); }
-            95% { transform: scaleY(0.1) translateY(0); }
-        }
-        @keyframes pulseGlow {
-            0% { transform: scale(1); filter: hue-rotate(0deg); }
-            50% { transform: scale(1.18); opacity: 0.9; }
-            100% { transform: scale(1); filter: hue-rotate(360deg); }
-        }
-        .status-badge { padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; }
-        .badge-paper { background: #2980b9; color: white; }
-        .badge-live { background: var(--neon-red); color: white; box-shadow: 0 0 10px var(--neon-red); }
-        .coin-checkbox { display: inline-flex; align-items: center; margin-right: 12px; background: #1e222d; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 8px;}
-        .coin-checkbox input { margin-right: 6px; }
-        .log-box {
-            background: #0e1118; border-radius: 6px; height: 220px; overflow-y: auto;
-            padding: 10px; font-family: monospace; font-size: 13px; color: #b2b5be;
-        }
-        button {
-            background: var(--neon-blue); border: none; color: black; font-weight: bold;
-            padding: 10px 20px; border-radius: 6px; cursor: pointer; transition: 0.2s;
-        }
-        button:hover { opacity: 0.8; box-shadow: 0 0 15px var(--neon-blue); }
-        .vova-speech {
-            background: rgba(255,255,255,0.05); padding: 10px 15px; border-radius: 8px;
+        
+        .quote-box { background: #030712; padding: 12px; border-radius: 8px; font-style: italic; color: #e2e8f0; font-size: 13px; text-align: center; margin-top: 10px; border-left: 4px solid #38bdf8; }
+        .data-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #374151; font-size: 14px; }
+        
+        /* THIẾT KẾ BỘ CHỌN COIN CHUYÊN NGHIỆP */
+        .select-box { width: 100%; padding: 10px; background: #1f2937; color: white; border: 1px solid #4b5563; border-radius: 6px; font-weight: bold; font-size: 14px; margin-bottom: 15px; cursor: pointer; }
+        .select-box:focus { border-color: #38bdf8; outline: none; }
+        
+        .btn { display: block; width: 100%; padding: 12px; background: #22c55e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; text-decoration: none; box-sizing: border-box; transition: background 0.2s; }
+        .btn:hover { background: #16a34a; }
+        .chart-container { height: 530px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #1f2937; }
+    </style>
+</head>
+<body>
+    <div class="grid-layout">
+        <!-- CỘT TRÁI: ĐIỀU KHIỂN & BỘ CHỌN COIN -->
+        <div class="panel">
+            <h2>🤖 ĐIỀU KHIỂN BOT AI</h2>
+            
+            <form action="/change-coin" method="POST">
+                <label style="font-size: 13px; color: #94a3b8; display:block; margin-bottom: 5px;">🔥 Lựa chọn Sản phẩm giao dịch:</label>
+                <select name="coin" class="select-box" onchange="this.form.submit()">
+                    <option value="BINANCE:ZECUSDT.P" {% if current_coin == 'BINANCE:ZECUSDT.P' %}selected{% endif %}>🛡️ ZEC / Tether Perpetual (Ưu tiên)</option>
+                    <option value="BINANCE:SOLUSDT.P" {% if current_coin == 'BINANCE:SOLUSDT.P' %}selected{% endif %}>⚡ SOL / Tether Perpetual (Ưu tiên)</option>
+                    <option value="BINANCE:BTCUSDT.P" {% if current_coin == 'BINANCE:BTCUSDT.P' %}selected{% endif %}>🪙 BTC / Tether Perpetual</option>
+                    <option value="BINANCE:ETHUSDT.P" {% if current_coin == 'BINANCE:ETHUSDT.P' %}selected{% endif %}>💎 ETH / Tether Perpetual</option>
+                </select>
+            </form>
+
+            <div class="vova-avatar-box">
+                <div class="vova-icon">{{ icon }}</div>
+                <div class="vova-title" style="font-weight: bold; margin-top: 10px; color: {{ color }}; text-shadow: 0 0 8px {{ color }};">{{ form }}</div>
+                <div class="vova-mood" style="font-size: 12px; color: #94a3b8; margin-top: 3px;">Tâm trạng: {{ mood }}</div>
+            </div>
+            
+            <div class="quote-box">💬 VOVA nói: "{{ quote }}"</div>
+            
+            <div style="margin-top: 15px; margin-bottom: 15px;">
+                <div class="data-row"><span>💵 Vốn ví giấy giả lập:</span><span style="color: #f59e0b; font-weight:bold;">{{ paper_balance }} USD</span></div>
+                <div class="data-row"><span>⭐ Cấp độ VOVA:</span><span>Cấp {{ level }}/10</span></div>
+                <div class="data-row"><span>🟢 Trạng thái mạng:</span><span style="color:#4ade80; font-weight:bold;">ONLINE (Tự động)</span></div>
+            </div>
+            
+            <a href="/test-tele" class="btn">⚡ Ép Gửi Tin Nhắn Telegram Khẩn Cấp</a>
+            
+            {% if test_result %}
+            <div style="background: #1e1b4b; padding: 12px; border-radius: 6px; margin-top: 10px; font-size:12px; border-left: 4px solid #6366f1;">
+                🛰️ <b>Phản hồi mạng:</b> {{ test_result }}
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- CỘT PHẢI: BIỂU ĐỒ HOẠT ĐỘNG CHUẨN XÁC NÉT CĂNG -->
+        <div class="panel" style="padding: 10px;">
+            <h3>📊 BIỂU ĐỒ NẾN THẬT BINANCE FUTURES</h3>
+            <div class="chart-container" id="vova_expert_chart"></div>
+            <script type="text/javascript">
+                // Khởi tạo đồ thị động bám sát theo loại coin sếp lựa chọn
+                new TradingView.widget({
+                    "autosize": true,
+                    "symbol": "{{ current_coin }}",
+                    "interval": "5",
+                    "timezone": "Asia/Ho_Chi_Minh",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "vi",
+                    "toolbar_bg": "#111827",
+                    "enable_publishing": false,
+                    "hide_side_toolbar": false,
+                    "allow_symbol_change": false,
+                    "container_id": "vova_expert_chart",
+                    "studies": [
+                        "RSI@tv-basicstudies"
+                    ]
+                });
+            </script>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+test_status_cache = None
+
+@web_app.route('/')
+def home():
+    global test_status_cache
+    state = get_state()
+    res = test_status_cache
+    test_status_cache = None
+    
+    lv = state.get("level", 1)
+    if lv <= 2: icon, form, color, rgb = "🥚", "Trứng Sơ Khai Neon", "#a8a29e", "168,162,158"
+    elif lv <= 4: icon, form, color, rgb = "🌱", "Mầm Cây Điện Tử", "#22c55e", "34,197,94"
+    elif lv <= 6: icon, form, color, rgb = "🦊", "Cáo Nhỏ Công Nghệ", "#f97316", "249,115,22"
+    else: icon, form, color, rgb = "🐉", "Thần Rồng AI Hủy Diệt", "#a855f7", "168,85,247"
+        
+    mood = state.get("mood", "Bình thường")
+    coin_clean = state.get("current_coin", "ZECUSDT").split(":")[-1].replace(".P", "")
+    quote = f"Em đang quét sóng thuật toán ZigZag cho đồng {coin_clean}. Sếp chọn đổi coin nào là biểu đồ tự nhảy theo đồng đó nhé!"
+
+    return render_template_string(
+        HTML_TEMPLATE, 
+        paper_balance=round(state.get("paper_balance", 1000.0), 2),
+        level=lv, mood=mood, icon=icon, form=form, color=color, rgb=rgb,
+        quote=quote, current_coin=state.get("current_coin"), test_result=res
+    )
+
+@web_app.route('/change-coin', methods=['POST'])
+def change_coin():
+state = get_state()
+selected_coin = request.form.get("coin", "BINANCE:ZECUSDT.P")
+state["current_coin"] = selected_coin
+save_state(state)
+return redirect(url_for('home'))
+@web_app.route('/test-tele')
+def test_tele():
+global test_status_cache
+state = get_state()
+coin_clean = state.get("current_coin", "ZECUSDT").split(":")[-1].replace(".P", "")
+status, response_text = send_telegram_direct(coin_clean)
+if status == 200:
+test_status_cache = f"Thành công (Mã 200)! Đã bắn tín hiệu quét {coin_clean} về Telegram iPhone của sếp mượt mà!"
+else:
+test_status_cache = f"Lỗi (Mã {status})! Chi tiết: {response_text}"
+return redirect(url_for('home'))
+if name == "main":
+port = int(os.environ.get("PORT", 8080))
+web_app.run(host='0.0.0.0', port=port)
